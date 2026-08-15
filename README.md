@@ -69,7 +69,10 @@ gespeichert. Die Originalfotos bleiben unverändert.
 Mit **Aktueller Ordner → Schlagwörter für alle Fotos neu erzeugen** lässt sich die
 KI-Analyse für den aktuellen Ordner samt Unterordnern vollständig wiederholen. Erfolgreiche
 Ergebnisse ersetzen die gespeicherten Schlagwörter und Beschreibungen im Cache; XMP-Dateien
-werden erst über die separate XMP-Aktion aktualisiert.
+werden erst nach einer ausdrücklichen Bestätigung geschrieben. Nach einer vollständig
+erfolgreichen KI-Verschlagwortung fragt RAW Viewer, ob die XMP-Dateien jetzt erzeugt
+werden sollen; mit **Später** bleiben die Fotos unverändert und der Export kann weiter
+über die separate XMP-Aktion erfolgen.
 
 Beim Laden verwendet RAW Viewer automatisch ein auf präzise Fotoanalyse abgestimmtes
 Profil: 16.384 Kontext-Tokens, Temperature 0,1, Top P 0,8, Top K 20, Min P 0,
@@ -140,6 +143,9 @@ Release lokal erstellen:
 ./script/release.sh 0.6.2
 ```
 
+Die an `release.sh` übergebene Versionsnummer wird dabei in die erzeugte App
+übernommen; der Updater vergleicht genau diese Versionsnummer mit dem GitHub-Release.
+
 Veröffentlichung zunächst ohne Änderungen an Git oder GitHub prüfen:
 
 ```sh
@@ -149,6 +155,15 @@ Veröffentlichung zunächst ohne Änderungen an Git oder GitHub prüfen:
 Danach veröffentlicht derselbe Befehl ohne `--dry-run` den bereits geprüften
 ZIP-Download als Tag und GitHub-Release. Das fertige Archiv liegt unter
 `dist/RAW-Viewer-<Version>-macOS-arm64.zip`.
+
+## Softwareupdates in der App
+
+RAW Viewer prüft beim Start im Hintergrund das neueste stabile GitHub-Release; über
+**RAW Viewer → Nach Updates suchen …** kann die Prüfung jederzeit wiederholt werden.
+Ist eine neuere Version verfügbar, wird sie erst nach Bestätigung geladen. Vor dem
+Ersetzen der laufenden App prüft RAW Viewer die von GitHub gelieferte SHA-256-Prüfsumme,
+Bundle-ID und Developer-ID-Signatur. Erst nach einer zweiten Bestätigung beendet sich die
+App, installiert die geprüfte Version am bisherigen App-Standort und startet sie neu.
 
 ## Lizenz
 

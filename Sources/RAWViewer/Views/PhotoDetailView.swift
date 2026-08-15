@@ -254,7 +254,7 @@ struct PhotoDetailView: View {
         } description: {
             Text("\(asset.filename)\n\(message)")
         } actions: {
-            Button("Zurück zum Grid") {
+            Button("Zurück zur Gesamtansicht") {
                 store.closePhoto()
             }
         }

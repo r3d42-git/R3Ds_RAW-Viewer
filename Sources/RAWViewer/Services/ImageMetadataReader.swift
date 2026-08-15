@@ -3,6 +3,7 @@ import CoreServices
 import ImageIO
 
 struct PhotoMetadata: Equatable, Sendable {
+    var captureDate: Date?
     var pixelWidth: Int?
     var pixelHeight: Int?
     var cameraMake: String?
@@ -19,6 +20,9 @@ struct PhotoMetadata: Equatable, Sendable {
 
     var rows: [(label: String, value: String)] {
         var result: [(String, String)] = []
+        if let captureDate {
+            result.append(("Aufnahmedatum", Self.dateTime(captureDate)))
+        }
         if let pixelWidth, let pixelHeight {
             result.append(("Abmessungen", "\(pixelWidth) × \(pixelHeight)"))
         }
@@ -49,6 +53,7 @@ struct PhotoMetadata: Equatable, Sendable {
     var isEmpty: Bool { rows.isEmpty }
 
     mutating func fillMissing(from fallback: PhotoMetadata) {
+        captureDate = captureDate ?? fallback.captureDate
         pixelWidth = pixelWidth ?? fallback.pixelWidth
         pixelHeight = pixelHeight ?? fallback.pixelHeight
         cameraMake = cameraMake ?? fallback.cameraMake
@@ -83,6 +88,18 @@ struct PhotoMetadata: Equatable, Sendable {
 
     private static func yesNo(_ value: Bool) -> String { value ? "Ja" : "Nein" }
 
+    private static func dateTime(_ value: Date) -> String {
+        value.formatted(
+            .dateTime
+                .locale(Locale(identifier: "de_DE"))
+                .day()
+                .month(.twoDigits)
+                .year()
+                .hour()
+                .minute()
+        )
+    }
+
     private static func decimal(_ value: Double) -> String {
         value.formatted(.number.locale(Locale(identifier: "de_DE")).precision(.fractionLength(0...2)))
     }
@@ -105,6 +122,10 @@ enum ImageMetadataReader {
         let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
         else { return nil }
 
+        return captureDate(in: properties)
+    }
+
+    private static func captureDate(in properties: [CFString: Any]) -> Date? {
         if let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any],
            let value = exif[kCGImagePropertyExifDateTimeOriginal] as? String,
            let date = parseEXIFDate(value) {
@@ -153,6 +174,7 @@ enum ImageMetadataReader {
         let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any]
         let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any]
         var imageIO = PhotoMetadata(
+            captureDate: captureDate(in: properties),
             pixelWidth: integer(properties[kCGImagePropertyPixelWidth]),
             pixelHeight: integer(properties[kCGImagePropertyPixelHeight]),
             cameraMake: string(tiff?[kCGImagePropertyTIFFMake]),

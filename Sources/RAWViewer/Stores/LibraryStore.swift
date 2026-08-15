@@ -23,6 +23,22 @@ struct LargePhotoSourceWarning: Identifiable {
     }
 }
 
+struct XMPExportSuggestion: Identifiable {
+    let id = UUID()
+    let photoIDs: Set<PhotoAsset.ID>
+
+    var photoCount: Int {
+        photoIDs.count
+    }
+
+    var message: String {
+        if photoCount == 1 {
+            return "Die KI-Verschlagwortung ist abgeschlossen. Soll für das eben verschlagwortete RAW-Foto jetzt eine .xmp-Datei neben dem Original angelegt werden?"
+        }
+        return "Die KI-Verschlagwortung ist abgeschlossen. Soll für die \(photoCount) eben verschlagworteten RAW-Fotos jetzt jeweils eine .xmp-Datei neben dem Original angelegt werden?"
+    }
+}
+
 struct ViewerCacheStats: Sendable {
     let indexedFileCount: Int
     let analyzedPhotoCount: Int
@@ -111,6 +127,11 @@ final class LibraryStore: ObservableObject {
     @Published var actionError: ViewerActionError?
     @Published private(set) var isCheckingSourceSize = false
     @Published var largePhotoSourceWarning: LargePhotoSourceWarning?
+    @Published var xmpExportSuggestion: XMPExportSuggestion?
+    @Published private(set) var softwareUpdateStatus: SoftwareUpdateStatus = .idle
+    @Published var softwareUpdatePrompt: SoftwareUpdate?
+    @Published private(set) var preparedSoftwareUpdate: PreparedSoftwareUpdate?
+    @Published var preparedSoftwareUpdatePrompt: PreparedSoftwareUpdate?
     @Published private(set) var isCacheConfigured = false
     @Published private(set) var isConfiguringCache = false
     @Published private(set) var cacheDirectoryURL: URL?
@@ -138,6 +159,7 @@ final class LibraryStore: ObservableObject {
     private let exportService: PhotoExportService
     private let lmStudioService: LMStudioService
     private let xmpSidecarService: XMPSidecarService
+    private let softwareUpdateService: SoftwareUpdateService
     private var scanTask: Task<Void, Never>?
     private var sourceSizeCheckTask: Task<Void, Never>?
     private var thumbnailPreparationTask: Task<Void, Never>?
@@ -151,8 +173,11 @@ final class LibraryStore: ObservableObject {
     private var analysisTask: Task<Void, Never>?
     private var xmpExportTask: Task<Void, Never>?
     private var rotationPersistenceTask: Task<Void, Never>?
+    private var softwareUpdateCheckTask: Task<Void, Never>?
+    private var softwareUpdateDownloadTask: Task<Void, Never>?
     private var pendingRotationAssets: [PhotoAsset.ID: PhotoAsset] = [:]
     private var didCheckLMStudio = false
+    private var didCheckSoftwareUpdate = false
 
     init(
         scanner: PhotoScanner = PhotoScanner(),
@@ -165,7 +190,8 @@ final class LibraryStore: ObservableObject {
         fullImageService: FullImageService = FullImageService(),
         exportService: PhotoExportService = PhotoExportService(),
         lmStudioService: LMStudioService = LMStudioService(),
-        xmpSidecarService: XMPSidecarService = XMPSidecarService()
+        xmpSidecarService: XMPSidecarService = XMPSidecarService(),
+        softwareUpdateService: SoftwareUpdateService = SoftwareUpdateService()
     ) {
         self.scanner = scanner
         self.folderSizeChecker = folderSizeChecker
@@ -178,6 +204,7 @@ final class LibraryStore: ObservableObject {
         self.exportService = exportService
         self.lmStudioService = lmStudioService
         self.xmpSidecarService = xmpSidecarService
+        self.softwareUpdateService = softwareUpdateService
         self.sources = bookmarkStore.loadSources()
         let savedSort = UserDefaults.standard.string(forKey: PreferenceKeys.sortOrder)
         self.sortOrder = PhotoSortOrder(rawValue: savedSort ?? "") ?? .newestFirst
@@ -220,6 +247,98 @@ final class LibraryStore: ObservableObject {
     func revealCacheInFinder() {
         guard let cacheDirectoryURL else { return }
         NSWorkspace.shared.activateFileViewerSelecting([cacheDirectoryURL])
+    }
+
+    var currentSoftwareVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unbekannt"
+    }
+
+    func checkForSoftwareUpdateAtLaunch() {
+        guard !didCheckSoftwareUpdate else { return }
+        didCheckSoftwareUpdate = true
+        checkForSoftwareUpdate(showErrors: false)
+    }
+
+    func checkForSoftwareUpdate(showErrors: Bool = true) {
+        guard softwareUpdateCheckTask == nil,
+              softwareUpdateDownloadTask == nil,
+              preparedSoftwareUpdate == nil else { return }
+        guard let currentVersion = SemanticVersion(string: currentSoftwareVersion) else {
+            if showErrors {
+                actionError = ViewerActionError(
+                    title: "Update-Prüfung nicht möglich",
+                    message: "Die Versionsnummer dieser App ist ungültig."
+                )
+            }
+            return
+        }
+
+        softwareUpdateStatus = .checking
+        let service = softwareUpdateService
+        softwareUpdateCheckTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let update = try await service.fetchLatestUpdate(currentVersion: currentVersion)
+                guard !Task.isCancelled else { return }
+                if let update {
+                    softwareUpdateStatus = .available(update)
+                    softwareUpdatePrompt = update
+                } else {
+                    softwareUpdateStatus = .upToDate
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                softwareUpdateStatus = .failed(error.localizedDescription)
+                if showErrors {
+                    actionError = ViewerActionError(title: "Update-Prüfung fehlgeschlagen", message: error.localizedDescription)
+                }
+            }
+            softwareUpdateCheckTask = nil
+        }
+    }
+
+    func dismissSoftwareUpdatePrompt() {
+        softwareUpdatePrompt = nil
+    }
+
+    func downloadSoftwareUpdate(_ update: SoftwareUpdate) {
+        guard softwareUpdateDownloadTask == nil,
+              softwareUpdateCheckTask == nil,
+              preparedSoftwareUpdate == nil else { return }
+        softwareUpdatePrompt = nil
+        softwareUpdateStatus = .downloading(update)
+        let service = softwareUpdateService
+        softwareUpdateDownloadTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let preparedUpdate = try await service.downloadAndPrepare(update)
+                guard !Task.isCancelled else { return }
+                softwareUpdateStatus = .readyToInstall(update)
+                preparedSoftwareUpdate = preparedUpdate
+                preparedSoftwareUpdatePrompt = preparedUpdate
+            } catch {
+                guard !Task.isCancelled else { return }
+                softwareUpdateStatus = .failed(error.localizedDescription)
+                actionError = ViewerActionError(title: "Update konnte nicht vorbereitet werden", message: error.localizedDescription)
+            }
+            softwareUpdateDownloadTask = nil
+        }
+    }
+
+    func dismissPreparedSoftwareUpdatePrompt() {
+        preparedSoftwareUpdatePrompt = nil
+    }
+
+    func installPreparedSoftwareUpdate(_ preparedUpdate: PreparedSoftwareUpdate) {
+        do {
+            try SoftwareUpdateInstaller.scheduleInstallation(of: preparedUpdate)
+            NSApp.terminate(nil)
+        } catch {
+            actionError = ViewerActionError(
+                title: "Update konnte nicht installiert werden",
+                message: "Die laufende App kann an diesem Ort nicht ersetzt werden. Lege RAW Viewer bitte zuerst in den Programme-Ordner und versuche es erneut.\n\n\(error.localizedDescription)"
+            )
+        }
     }
 
     func clearThumbnailCache() async {
@@ -1215,6 +1334,8 @@ final class LibraryStore: ObservableObject {
             var completed = 0
             var failed = 0
             var firstFailure: Error?
+            var wasCancelled = false
+            var successfullyAnalyzedPhotoIDs: Set<PhotoAsset.ID> = []
 
             do {
                 handle = try await service.prepareModel(configuration: configuration)
@@ -1254,6 +1375,7 @@ final class LibraryStore: ObservableObject {
                             try await catalog.saveAnalysis(analysis)
                             analysesByPhotoID[asset.id] = analysis
                             xmpExportsByPhotoID.removeValue(forKey: asset.id)
+                            successfullyAnalyzedPhotoIDs.insert(asset.id)
                             completed += 1
                         } catch is CancellationError {
                             throw CancellationError()
@@ -1265,6 +1387,7 @@ final class LibraryStore: ObservableObject {
                 }
             } catch is CancellationError {
                 // The progress summary below preserves already completed analyses.
+                wasCancelled = true
             } catch {
                 firstFailure = error
                 failed = max(failed, assets.count - completed)
@@ -1285,6 +1408,10 @@ final class LibraryStore: ObservableObject {
             await updateCacheStatistics()
             await refreshLMStudioStatus()
 
+            if !wasCancelled, failed == 0 {
+                suggestXMPExport(for: successfullyAnalyzedPhotoIDs)
+            }
+
             if failed > 0, let firstFailure {
                 actionError = ViewerActionError(
                     title: "Fotoanalyse nicht vollständig",
@@ -1294,9 +1421,21 @@ final class LibraryStore: ObservableObject {
         }
     }
 
-    func exportPendingXMPInSelectedFolder() {
+    func confirmXMPExportSuggestion() {
+        guard let suggestion = xmpExportSuggestion else { return }
+        xmpExportSuggestion = nil
+        exportPendingXMPInSelectedFolder(onlyPhotoIDs: suggestion.photoIDs)
+    }
+
+    func dismissXMPExportSuggestion() {
+        xmpExportSuggestion = nil
+    }
+
+    func exportPendingXMPInSelectedFolder(onlyPhotoIDs: Set<PhotoAsset.ID>? = nil) {
         guard xmpExportTask == nil, analysisTask == nil else { return }
-        let candidates = photosInSelectedFolderScope.compactMap { asset -> (PhotoAsset, [String], [String], String)? in
+        let exportScope = onlyPhotoIDs == nil ? photosInSelectedFolderScope : photos
+        let candidates = exportScope.compactMap { asset -> (PhotoAsset, [String], [String], String)? in
+            guard onlyPhotoIDs?.contains(asset.id) ?? true else { return nil }
             let keywords = effectiveKeywords(for: asset)
             let previousPersonKeywords = previouslyExportedPersonKeywords(for: asset.id)
             let keywordsJSON = effectiveKeywordsJSON(for: asset)
@@ -1380,6 +1519,18 @@ final class LibraryStore: ObservableObject {
                 )
             }
         }
+    }
+
+    private func suggestXMPExport(for analyzedPhotoIDs: Set<PhotoAsset.ID>) {
+        guard xmpExportSuggestion == nil else { return }
+        let eligiblePhotoIDs = Set(photos.compactMap { asset -> PhotoAsset.ID? in
+            guard analyzedPhotoIDs.contains(asset.id),
+                  xmpSidecarService.sidecarURL(for: asset) != nil,
+                  !effectiveKeywords(for: asset).isEmpty || !previouslyExportedPersonKeywords(for: asset.id).isEmpty else { return nil }
+            return asset.id
+        })
+        guard !eligiblePhotoIDs.isEmpty else { return }
+        xmpExportSuggestion = XMPExportSuggestion(photoIDs: eligiblePhotoIDs)
     }
 
     func cancelXMPExport() {

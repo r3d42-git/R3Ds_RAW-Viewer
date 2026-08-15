@@ -23,6 +23,11 @@ struct SettingsView: View {
                 .tabItem {
                     Label("KI-Analyse", systemImage: "sparkles")
                 }
+
+            softwareUpdateSettings
+                .tabItem {
+                    Label("Updates", systemImage: "arrow.triangle.2.circlepath")
+                }
         }
         .frame(width: 620, height: 440)
         .alert(item: $confirmation) { confirmation in
@@ -148,6 +153,91 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private var softwareUpdateSettings: some View {
+        Form {
+            Section("RAW Viewer") {
+                LabeledContent("Installierte Version", value: store.currentSoftwareVersion)
+                updateStatus
+            }
+
+            Section {
+                HStack {
+                    Button("Nach Updates suchen") {
+                        store.checkForSoftwareUpdate()
+                    }
+                    .disabled(isCheckingForSoftwareUpdate || isDownloadingSoftwareUpdate || isSoftwareUpdateReady)
+
+                    if case .available(let update) = store.softwareUpdateStatus {
+                        Button("Update laden") {
+                            store.downloadSoftwareUpdate(update)
+                        }
+                    }
+                    if case .readyToInstall = store.softwareUpdateStatus,
+                       let preparedUpdate = store.preparedSoftwareUpdate {
+                        Button("Jetzt installieren") {
+                            store.installPreparedSoftwareUpdate(preparedUpdate)
+                        }
+                    }
+                }
+            } footer: {
+                Text("Updates stammen ausschließlich aus dem offiziellen GitHub-Release. Vor der Installation prüft RAW Viewer Download-Prüfsumme, Bundle-ID und Developer-ID-Signatur.")
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    @ViewBuilder
+    private var updateStatus: some View {
+        switch store.softwareUpdateStatus {
+        case .idle:
+            Text("Noch nicht geprüft")
+                .foregroundStyle(.secondary)
+        case .checking:
+            LabeledContent("Status") {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Prüfe auf Updates …")
+                }
+            }
+        case .upToDate:
+            LabeledContent("Status", value: "Aktuell")
+        case .available(let update):
+            LabeledContent("Status", value: "Version \(update.version) verfügbar")
+        case .downloading(let update):
+            LabeledContent("Status") {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(verbatim: "Version \(update.version) wird geprüft …")
+                }
+            }
+        case .readyToInstall(let update):
+            LabeledContent("Status", value: "Version \(update.version) ist bereit")
+        case .failed(let message):
+            LabeledContent("Status") {
+                Text(message)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.trailing)
+            }
+        }
+    }
+
+    private var isCheckingForSoftwareUpdate: Bool {
+        if case .checking = store.softwareUpdateStatus { return true }
+        return false
+    }
+
+    private var isDownloadingSoftwareUpdate: Bool {
+        if case .downloading = store.softwareUpdateStatus { return true }
+        return false
+    }
+
+    private var isSoftwareUpdateReady: Bool {
+        if case .readyToInstall = store.softwareUpdateStatus { return true }
+        return false
     }
 }
 

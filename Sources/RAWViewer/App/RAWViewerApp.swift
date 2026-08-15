@@ -36,12 +36,34 @@ struct RAWViewerApp: App {
                 .disabled(store.isCheckingSourceSize)
             }
 
+            CommandGroup(after: .appInfo) {
+                Button("Nach Updates suchen …") {
+                    store.checkForSoftwareUpdate()
+                }
+                .disabled(store.softwareUpdateStatus == .checking || isDownloadingSoftwareUpdate || isSoftwareUpdateReady)
+            }
+
             CommandMenu("Ansicht") {
                 Button("Neu einlesen") {
                     store.refresh()
                 }
                 .keyboardShortcut("r", modifiers: .command)
                 .disabled(store.selectedFolderURL == nil)
+
+                Divider()
+
+                Button("Zur Gesamtansicht") {
+                    store.closePhoto()
+                }
+                .keyboardShortcut("g", modifiers: [])
+                .disabled(store.viewMode != .photo)
+
+                Button("Ausgewähltes Foto anzeigen") {
+                    guard let photo = store.selectedPhoto else { return }
+                    store.openPhoto(photo)
+                }
+                .keyboardShortcut("f", modifiers: [])
+                .disabled(store.viewMode != .grid || store.selectedPhoto == nil)
 
                 Divider()
 
@@ -113,5 +135,15 @@ struct RAWViewerApp: App {
         store.selectedPhotoCount > 1
             ? "\(store.selectedPhotoCount) Fotos nach \(direction) drehen"
             : "Nach \(direction) drehen"
+    }
+
+    private var isDownloadingSoftwareUpdate: Bool {
+        if case .downloading = store.softwareUpdateStatus { return true }
+        return false
+    }
+
+    private var isSoftwareUpdateReady: Bool {
+        if case .readyToInstall = store.softwareUpdateStatus { return true }
+        return false
     }
 }

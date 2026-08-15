@@ -19,6 +19,9 @@ struct ContentView: View {
         .task {
             await store.checkLMStudioAtLaunch()
         }
+        .task {
+            store.checkForSoftwareUpdateAtLaunch()
+        }
         .alert(item: $store.actionError) { error in
             Alert(
                 title: Text(error.title),
@@ -35,6 +38,42 @@ struct ContentView: View {
                 },
                 secondaryButton: .cancel(Text("Abbrechen")) {
                     store.cancelAddingLargePhotoSources()
+                }
+            )
+        }
+        .alert(item: $store.xmpExportSuggestion) { suggestion in
+            Alert(
+                title: Text("XMP-Sidecars schreiben?"),
+                message: Text(suggestion.message),
+                primaryButton: .default(Text("XMP schreiben")) {
+                    store.confirmXMPExportSuggestion()
+                },
+                secondaryButton: .cancel(Text("Später")) {
+                    store.dismissXMPExportSuggestion()
+                }
+            )
+        }
+        .alert(item: $store.softwareUpdatePrompt) { update in
+            Alert(
+                title: Text(verbatim: "RAW Viewer \(update.version) ist verfügbar"),
+                message: Text("Das Update wird von GitHub geladen und vor der Installation mit SHA-256 und der Developer-ID-Signatur geprüft."),
+                primaryButton: .default(Text("Laden und prüfen")) {
+                    store.downloadSoftwareUpdate(update)
+                },
+                secondaryButton: .cancel(Text("Später")) {
+                    store.dismissSoftwareUpdatePrompt()
+                }
+            )
+        }
+        .alert(item: $store.preparedSoftwareUpdatePrompt) { preparedUpdate in
+            Alert(
+                title: Text(verbatim: "Update \(preparedUpdate.update.version) ist bereit"),
+                message: Text("RAW Viewer wird beendet, durch die geprüfte Version ersetzt und anschließend neu gestartet."),
+                primaryButton: .default(Text("Installieren und neu starten")) {
+                    store.installPreparedSoftwareUpdate(preparedUpdate)
+                },
+                secondaryButton: .cancel(Text("Später")) {
+                    store.dismissPreparedSoftwareUpdatePrompt()
                 }
             )
         }

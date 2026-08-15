@@ -63,7 +63,7 @@ echo "==> Testing Swift package"
 (cd "$ROOT_DIR" && ./script/build_and_run.sh --test)
 
 echo "==> Building and signing optimized $ARCHITECTURE app"
-(cd "$ROOT_DIR" && RAW_VIEWER_SIGNING_IDENTITY="$SIGNING_IDENTITY" ./script/build_and_run.sh --build)
+(cd "$ROOT_DIR" && RAW_VIEWER_VERSION="$VERSION" RAW_VIEWER_SIGNING_IDENTITY="$SIGNING_IDENTITY" ./script/build_and_run.sh --build)
 
 [[ -x "$APP_BINARY" ]] || die "release executable not found: $APP_BINARY"
 [[ "$(plutil -extract CFBundleIdentifier raw -o - "$INFO_PLIST")" == "$BUNDLE_ID" ]] || \

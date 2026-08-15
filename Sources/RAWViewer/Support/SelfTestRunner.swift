@@ -11,7 +11,7 @@ enum SelfTestRunner {
     }
 
     static func run() async -> Int32 {
-        let checks: [(String, () async throws -> Void)] = [
+        var checks: [(String, () async throws -> Void)] = [
             ("Dateitypen", checkFileTypes),
             ("Rekursion und RAW-Paarung", checkRecursiveGrouping),
             ("Warnschwelle für große Fotoordner", checkLargeFolderWarningThreshold),
@@ -29,6 +29,8 @@ enum SelfTestRunner {
             ("KI-Schlagwortindex", checkPhotoAnalysisCatalog),
             ("Katalogmigration", checkLegacyCatalogMigration),
             ("XMP-Sidecars", checkXMPSidecars),
+            ("XMP-Exportabfrage", checkXMPExportSuggestion),
+            ("Softwareupdates", checkSoftwareUpdates),
             ("LM-Studio-Konfiguration", checkLMStudioConfiguration),
             ("Metadaten-Cache", checkMetadataReuse),
             ("Einheitlicher 1024er-Thumbnail-Cache", checkThumbnailBuckets),
@@ -36,6 +38,9 @@ enum SelfTestRunner {
             ("Scan-Abbruch", checkCancellation),
             ("10.000 Dateieinträge", checkTenThousandFiles)
         ]
+        if ProcessInfo.processInfo.environment["RAW_VIEWER_LIVE_UPDATE_TEST"] == "1" {
+            checks.append(("Öffentliches Softwareupdate", checkLiveSoftwareUpdate))
+        }
         print("RAW Viewer Self-Tests")
         for (name, check) in checks {
             do {
@@ -151,6 +156,64 @@ enum SelfTestRunner {
         try require(
             LibraryViewMode.grid.escapeKeyAction == .clearSelection,
             "ESC hebt die Galerieauswahl nicht auf"
+        )
+    }
+
+    private static func checkXMPExportSuggestion() async throws {
+        let single = XMPExportSuggestion(photoIDs: ["photo-1"])
+        try require(single.photoCount == 1, "Einzelfoto-Abfrage zählt falsch")
+        try require(single.message.contains("RAW-Foto"), "Einzelfoto-Abfrage ist nicht verständlich")
+
+        let multiple = XMPExportSuggestion(photoIDs: ["photo-1", "photo-2"])
+        try require(multiple.photoCount == 2, "Mehrfachfoto-Abfrage zählt falsch")
+        try require(multiple.message.contains("2 eben verschlagworteten RAW-Fotos"), "Mehrfachfoto-Abfrage ist nicht verständlich")
+    }
+
+    private static func checkSoftwareUpdates() async throws {
+        guard let current = SemanticVersion(string: "0.6.2"),
+              let older = SemanticVersion(string: "v0.6.1"),
+              let newer = SemanticVersion(string: "1.0.0") else {
+            throw CheckFailure(message: "Versionsnummern können nicht gelesen werden")
+        }
+        try require(older < current && current < newer, "Versionsvergleich ist falsch")
+
+        let releaseJSON = """
+        {
+          "tag_name": "v0.6.3",
+          "html_url": "https://github.com/c5vcpq5gsr-alt/R3Ds_RAW-Viewer/releases/tag/v0.6.3",
+          "assets": [
+            {
+              "name": "RAW-Viewer-0.6.3-macOS-arm64.zip",
+              "browser_download_url": "https://example.invalid/RAW-Viewer-0.6.3-macOS-arm64.zip",
+              "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              "size": 1024
+            }
+          ]
+        }
+        """.data(using: .utf8)!
+        let update = try SoftwareUpdateService.update(fromReleaseData: releaseJSON, currentVersion: current)
+        try require(update?.version.description == "0.6.3", "Neues GitHub-Release wird nicht erkannt")
+        try require(update?.expectedSHA256.count == 64, "SHA-256-Digest wird nicht übernommen")
+        let olderUpdate = try SoftwareUpdateService.update(fromReleaseData: releaseJSON, currentVersion: newer)
+        try require(
+            olderUpdate == nil,
+            "Kein älteres Update darf angeboten werden"
+        )
+    }
+
+    private static func checkLiveSoftwareUpdate() async throws {
+        guard let previousVersion = SemanticVersion(string: "0.0.0") else {
+            throw CheckFailure(message: "Testversion kann nicht gelesen werden")
+        }
+        let service = SoftwareUpdateService()
+        guard let update = try await service.fetchLatestUpdate(currentVersion: previousVersion) else {
+            throw CheckFailure(message: "Das öffentliche Release wurde nicht als Update erkannt")
+        }
+        let preparedUpdate = try await service.downloadAndPrepare(update)
+        defer { try? FileManager.default.removeItem(at: preparedUpdate.workingDirectory) }
+        try require(
+            FileManager.default.fileExists(atPath: preparedUpdate.appURL.appendingPathComponent("Contents/MacOS/RAWViewer").path),
+            "Das geprüfte öffentliche Update enthält keine ausführbare App"
         )
     }
 
@@ -288,6 +351,11 @@ enum SelfTestRunner {
             try writeTinyPNG(to: url)
             let metadata = ImageMetadataReader.metadata(at: url)
             try require(metadata.pixelWidth == 1 && metadata.pixelHeight == 1, "Bildabmessungen fehlen")
+            let metadataWithCaptureDate = PhotoMetadata(captureDate: Date(timeIntervalSince1970: 0))
+            try require(
+                metadataWithCaptureDate.rows.contains { $0.label == "Aufnahmedatum" && !$0.value.isEmpty },
+                "Aufnahmedatum wird nicht angezeigt"
+            )
             try require(
                 PhotoMetadata.exposureTimeLabel(1.0 / 250.0) == "1/250",
                 "Belichtungszeit wird nicht als Bruch formatiert"
