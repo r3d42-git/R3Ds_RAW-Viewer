@@ -180,7 +180,7 @@ enum SelfTestRunner {
         let releaseJSON = """
         {
           "tag_name": "v0.6.3",
-          "html_url": "https://github.com/c5vcpq5gsr-alt/R3Ds_RAW-Viewer/releases/tag/v0.6.3",
+          "html_url": "https://github.com/r3d42-git/R3Ds_RAW-Viewer/releases/tag/v0.6.3",
           "assets": [
             {
               "name": "RAW-Viewer-0.6.3-macOS-arm64.zip",
