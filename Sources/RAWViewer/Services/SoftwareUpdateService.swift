@@ -44,7 +44,7 @@ enum SoftwareUpdateError: LocalizedError, Sendable {
 }
 
 final class SoftwareUpdateService: @unchecked Sendable {
-    private static let repository = "c5vcpq5gsr-alt/R3Ds_RAW-Viewer"
+    private static let repository = "r3d42-git/R3Ds_RAW-Viewer"
     private static let bundleIdentifier = "de.r3d.rawviewer"
     private static let signingTeamIdentifier = "G6JH37W285"
     private static let maximumAssetSize = 1_000_000_000
