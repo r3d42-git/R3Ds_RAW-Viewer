@@ -120,8 +120,21 @@ Run the integrated test suite:
 
 The build script requires a complete Xcode installation selected through
 `xcode-select`. It uses Xcode's active Swift compiler and macOS SDK without a
-project-specific SDK override. The current verified setup is Xcode 26.6,
-Swift 6.3.3 and the macOS 26.5 SDK.
+project-specific SDK override. The current verified setup (2026-09-15) is
+macOS 27.0 (26A428), Xcode 27.0 (27A266a), Swift 6.4 and the macOS 27.0 SDK
+on Apple silicon. The minimum deployment target remains macOS 15.0.
+
+The macOS 27 compatibility check passed the release build, all 25 integrated
+checks, app launch and local bundle signature verification. A UI smoke test
+confirmed the existing photo library, JPEG display and metadata, and the
+Blocksatz → F → single photo → G → Blocksatz navigation.
+
+Additional user acceptance testing confirmed successful RAW display with files
+from two Canon and two Sony cameras, and successful live AI analysis with
+LM Studio. The user also confirmed that the update check correctly reports
+that no update is available. The update installation flow could not be tested
+because no newer update is available. This check does not constitute a
+notarized release.
 
 The generated app bundle is written to `dist/RAW Viewer.app`.
 
