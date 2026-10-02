@@ -10,8 +10,8 @@ APP_NAME="RAW Viewer"
 PROCESS_NAME="RAWViewer"
 BUNDLE_ID="de.r3d.rawviewer"
 MIN_SYSTEM_VERSION="15.0"
-APP_VERSION="${RAW_VIEWER_VERSION:-0.6.2}"
-BUILD_NUMBER="${RAW_VIEWER_BUILD_NUMBER:-12}"
+APP_VERSION="${RAW_VIEWER_VERSION:-0.6.4}"
+BUILD_NUMBER="${RAW_VIEWER_BUILD_NUMBER:-13}"
 SIGNING_IDENTITY="${RAW_VIEWER_SIGNING_IDENTITY:--}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -64,6 +64,9 @@ if [[ ! -f "$APP_ICON_SOURCE" ]]; then
   exit 1
 fi
 cp "$APP_ICON_SOURCE" "$APP_RESOURCES/AppIcon.icns"
+for notice in LICENSE LICENSING.md LICENSE-MIT; do
+  cp "$ROOT_DIR/$notice" "$APP_RESOURCES/$notice"
+done
 
 cat >"$INFO_PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

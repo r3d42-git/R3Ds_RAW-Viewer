@@ -44,7 +44,8 @@ NOTARY_DIR="$OUTPUT_DIR/notary"
 SUBMISSION_ZIP="$NOTARY_DIR/RAW-Viewer-$VERSION-macOS-$ARCHITECTURE-submitted.zip"
 NOTARY_RESULT="$NOTARY_DIR/RAW-Viewer-$VERSION-notary-result.json"
 NOTARY_LOG="$NOTARY_DIR/RAW-Viewer-$VERSION-notary-log.json"
-SIGNING_IDENTITY="${MACOS_SIGNING_IDENTITY:-Developer ID Application: Philipp John Hild (G6JH37W285)}"
+# Fingerprint selects G2 when Developer ID certificates share a name.
+SIGNING_IDENTITY="${MACOS_SIGNING_IDENTITY:-D548540E7FE1BD9B3C4518CC02D8786E1BFEB885}"
 NOTARY_PROFILE="${MACOS_NOTARY_PROFILE:-RAW-Viewer-notary}"
 
 for command_name in codesign security xcrun ditto unzip shasum spctl plutil file; do
@@ -59,6 +60,8 @@ fi
 security find-identity -v -p codesigning | grep -F "$SIGNING_IDENTITY" >/dev/null || \
   die "Developer ID signing identity is unavailable: $SIGNING_IDENTITY"
 
+"$ROOT_DIR/script/verify_license_material.sh" "$ROOT_DIR"
+
 echo "==> Testing Swift package"
 (cd "$ROOT_DIR" && ./script/build_and_run.sh --test)
 
@@ -66,6 +69,7 @@ echo "==> Building and signing optimized $ARCHITECTURE app"
 (cd "$ROOT_DIR" && RAW_VIEWER_VERSION="$VERSION" RAW_VIEWER_SIGNING_IDENTITY="$SIGNING_IDENTITY" ./script/build_and_run.sh --build)
 
 [[ -x "$APP_BINARY" ]] || die "release executable not found: $APP_BINARY"
+"$ROOT_DIR/script/verify_license_material.sh" "$APP_BUNDLE/Contents/Resources"
 [[ "$(plutil -extract CFBundleIdentifier raw -o - "$INFO_PLIST")" == "$BUNDLE_ID" ]] || \
   die "app bundle identifier does not match $BUNDLE_ID"
 [[ "$(plutil -extract CFBundleShortVersionString raw -o - "$INFO_PLIST")" == "$VERSION" ]] || \
@@ -118,6 +122,7 @@ VERIFY_DIR="$(mktemp -d /private/tmp/raw-viewer-release-verify.XXXXXX)"
 trap 'rm -rf "$VERIFY_DIR"' EXIT
 ditto -x -k "$FINAL_ZIP" "$VERIFY_DIR"
 EXTRACTED_APP="$VERIFY_DIR/$APP_NAME.app"
+"$ROOT_DIR/script/verify_license_material.sh" "$EXTRACTED_APP/Contents/Resources"
 [[ "$(plutil -extract CFBundleShortVersionString raw -o - "$EXTRACTED_APP/Contents/Info.plist")" == "$VERSION" ]] || \
   die "extracted app version does not match $VERSION"
 file "$EXTRACTED_APP/Contents/MacOS/$PROCESS_NAME" | grep -F "arm64" >/dev/null || \

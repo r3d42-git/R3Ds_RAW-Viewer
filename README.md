@@ -153,7 +153,7 @@ Voraussetzungen:
 Release lokal erstellen:
 
 ```sh
-./script/release.sh 0.6.2
+./script/release.sh 0.6.4
 ```
 
 Die an `release.sh` übergebene Versionsnummer wird dabei in die erzeugte App
@@ -162,12 +162,20 @@ Die an `release.sh` übergebene Versionsnummer wird dabei in die erzeugte App
 Veröffentlichung zunächst ohne Änderungen an Git oder GitHub prüfen:
 
 ```sh
-./script/publish_release.sh --dry-run 0.6.2
+./script/publish_release.sh --dry-run 0.6.4
 ```
 
 Danach veröffentlicht derselbe Befehl ohne `--dry-run` den bereits geprüften
 ZIP-Download als Tag und GitHub-Release. Das fertige Archiv liegt unter
 `dist/RAW-Viewer-<Version>-macOS-arm64.zip`.
+
+### Lizenzstand für v0.6.4
+
+Ab v0.6.4 steht RAW Viewer unter **GPL-3.0-or-later**. Die vollständige GPLv3
+steht in `LICENSE`; das App-Paket enthält `LICENSE`, `LICENSING.md` und den
+historischen MIT-Text `LICENSE-MIT`. Frühere veröffentlichte Versionen behalten
+ihre MIT-Lizenz. Der Release- und der Publish-Pfad prüfen die Lizenzdateien im
+jeweils tatsächlich verpackten App-Bundle.
 
 ## Softwareupdates in der App
 
@@ -180,4 +188,4 @@ App, installiert die geprüfte Version am bisherigen App-Standort und startet si
 
 ## Lizenz
 
-RAW Viewer wird unter der [MIT-Lizenz](LICENSE) veröffentlicht.
+RAW Viewer steht ab v0.6.4 unter [GPL-3.0-or-later](LICENSE). Die frühere MIT-Lizenz und der Copyright-Hinweis bleiben in [LICENSE-MIT](LICENSE-MIT) erhalten; frühere Releases behalten ihre jeweilige Lizenz.
