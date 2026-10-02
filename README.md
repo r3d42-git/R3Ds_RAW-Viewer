@@ -189,3 +189,12 @@ App, installiert die geprüfte Version am bisherigen App-Standort und startet si
 ## Lizenz
 
 RAW Viewer steht ab v0.6.4 unter [GPL-3.0-or-later](LICENSE). Die frühere MIT-Lizenz und der Copyright-Hinweis bleiben in [LICENSE-MIT](LICENSE-MIT) erhalten; frühere Releases behalten ihre jeweilige Lizenz.
+
+## Abgeschlossener G2-Release 0.6.4 — 2026-10-02
+
+- [0.6.4](https://github.com/r3d42-git/R3Ds_RAW-Viewer/releases/tag/v0.6.4) veröffentlicht. Annotierter Tag `v0.6.4` bleibt auf Quellcommit `89de489f1d8b73aec4b75aa203cff16748d5f491`; Abschlussnachweise folgen separat.
+- Native Swift-Pakettests, Release-/Publish-/Lizenzprüfung erfolgreich; beschädigte und fehlende Lizenzmaterialien werden abgelehnt.
+- Apple-Submission(s) `c07651fe-14e1-45c8-baea-e624bd8a1a89`: Accepted; angeheftetes App-Ticket im finalen Paket geprüft. Bei DMGs trägt auch der Container ein eigenes gültiges Ticket.
+- Frischer GitHub-Download: SHA-256 `24ac857e5d0c6fa0121e9c0fcc3ce4dac152980fc51f584c68dd852cb2aef036`, strikte Signatur, Bundle-Metadaten, Architektur, Stapling und Gatekeeper erfolgreich. Zusätzliche Leaf-Prüfung bestätigt exakt G2 `D548540E7FE1BD9B3C4518CC02D8786E1BFEB885`.
+- Asset `RAW-Viewer-0.6.4-macOS-arm64.zip`, Version/Build `0.6.4/13`, Bundle-ID `de.r3d.rawviewer`. Keine neue manuelle UI-Abnahme abgeleitet.
+- Exakte Quellcommit-CI [Run 36974588564](https://github.com/r3d42-git/R3Ds_RAW-Viewer/actions/runs/36974588564) erfolgreich.
